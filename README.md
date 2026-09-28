@@ -1,219 +1,137 @@
 # discord-mcp
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/FmBlueSystem/discord-mcp)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://github.com/FmBlueSystem/discord-mcp)
+A small Discord MCP server with **23 tools**, Discord REST API v10, and stdio transport. No Discord gateway connection or discord.js dependency. Existing v3 tool names are preserved.
 
-Discord MCP Server — 22 tools for AI agents to interact with Discord via REST API.
+> **Account risk:** Automating a normal Discord account using a user token (a selfbot) violates Discord's terms and can result in account termination. [Discord's official policy](https://support.discord.com/hc/en-us/articles/115002192352-Automated-User-Accounts-Self-Bots). `DISCORD_USER_TOKEN` remains available on a best-effort basis; Discord does not provide a supported user-token automation API. A bot account is the supported automation route.
 
-No discord.js. No WebSocket gateway. Single dependency. Works with user tokens (no admin needed) or bot tokens.
+## Install and run
 
-## Features
+Use **Node.js 24 LTS** (recommended), Node.js 22.13+, or Node.js 26. Node 18 and 20 are end-of-life; use a maintained Node release. See the [Node release schedule](https://nodejs.org/en/about/previous-releases).
 
-- **22 MCP Tools** across 6 categories — Guilds, Channels, Messages, Forums, Reactions, Webhooks
-- **Channel name resolution** — pass `"general"` instead of numeric IDs
-- **Two auth modes** — User Token (no admin, captured via Playwright) or Bot Token (admin required)
-- **REST API only** — no discord.js, no WebSocket gateway, 1 dependency (`@modelcontextprotocol/sdk`)
-- **Rate limit handling** — automatic retry with `Retry-After` header (up to 3 attempts)
-- **Error handling with solutions** — Discord error codes map to human-readable fixes
-- **Banned guilds/users** — environment variables to block writes or filter reads
-- **Forum support** — list forums, create posts, reply to threads
-- **Webhook support** — create, list, send messages as custom identity, delete webhooks
-- **Reactions** — add, remove, and batch add emoji reactions
-
-## Tools
-
-### Guilds (2)
-
-| Tool | Description |
-|------|-------------|
-| `discord_list_guilds` | List all servers the authenticated user/bot has access to |
-| `discord_get_guild` | Get detailed info about a specific guild |
-
-### Channels (4)
-
-| Tool | Description |
-|------|-------------|
-| `discord_list_channels` | List all channels in a guild |
-| `discord_get_channel_info` | Get metadata for a specific channel |
-| `discord_create_channel` | Create a new text or voice channel |
-| `discord_modify_channel` | Update channel properties (name, topic, slowmode, etc.) |
-
-### Messages (6)
-
-| Tool | Description |
-|------|-------------|
-| `discord_read_channel` | Read messages from a channel with pagination |
-| `discord_get_message` | Get a specific message by ID |
-| `discord_get_pinned` | Get pinned messages in a channel |
-| `discord_send_message` | Send a message to a channel |
-| `discord_search_messages` | Search messages by text content |
-| `discord_delete_message` | Delete a specific message |
-
-### Forums (4)
-
-| Tool | Description |
-|------|-------------|
-| `discord_list_forum_posts` | List posts in a forum channel |
-| `discord_create_forum_post` | Create a new post in a forum channel |
-| `discord_get_forum_post` | Get a specific forum post with its thread |
-| `discord_reply_to_thread` | Reply to an existing forum thread |
-
-### Reactions (3)
-
-| Tool | Description |
-|------|-------------|
-| `discord_add_reaction` | Add an emoji reaction to a message |
-| `discord_remove_reaction` | Remove a specific emoji reaction from a message |
-| `discord_batch_add_reactions` | Add multiple emoji reactions to a message at once |
-
-### Webhooks (4)
-
-| Tool | Description |
-|------|-------------|
-| `discord_create_webhook` | Create a webhook in a channel |
-| `discord_list_webhooks` | List all webhooks in a channel or guild |
-| `discord_send_webhook_message` | Send a message as a webhook with custom username/avatar |
-| `discord_delete_webhook` | Delete a webhook |
-
-## Quick Start
-
-### 1. Install
-
-```bash
-mkdir -p ~/.config/opencode/plugins/discord-mcp
-cd ~/.config/opencode/plugins/discord-mcp
-npm init -y
-npm install @modelcontextprotocol/sdk
+```sh
+git clone https://github.com/FmBlueSystem/discord-mcp.git
+cd discord-mcp
+npm ci
+npm run check
 ```
 
-Copy `assets/index.mjs` to the project root:
+Configure exactly one credential in your MCP client's secret/environment settings:
 
-```bash
-cp assets/index.mjs index.mjs
-```
+- `DISCORD_BOT_TOKEN`: raw bot token; the server supplies the `Bot ` authorization prefix. A token already prefixed with `Bot ` is accepted too.
+- `DISCORD_USER_TOKEN`: an existing raw token for your own account; sent without a prefix. This mode logs an account-risk warning to stderr. There is no automated login, token extraction, CAPTCHA handling, or account recovery in this project. Access is limited to what Discord permits for that account; it may stop working without notice.
 
-### 2. Get your Discord token
+Setting both credentials, neither credential, or malformed configured IDs stops startup. Keep tokens out of commits, shared configuration, screenshots, and chat. A `.env` file is **not loaded automatically**. If you use one locally, Node supports `node --env-file=.env assets/index.mjs`; supply only one token.
 
-#### Option A: User Token (no admin needed)
+The entry point is **`assets/index.mjs`**. Run `npm start` once the environment is configured, or launch that file directly from an MCP client. Install the full repository; `assets/discord-client.mjs` must stay beside it. You no longer need to copy a template into the project root.
 
-Use Playwright to capture your token from a browser session:
+### Bot setup
 
-```python
-from playwright.sync_api import sync_playwright
+1. Create an application and bot in the [Discord Developer Portal](https://discord.com/developers/applications), then securely store its token.
+2. Have someone with permission to install the bot invite it to the intended server. The bot itself does not need Administrator permission.
+3. Grant only permissions needed for your tools: View Channel and Read Message History for reads; Send Messages and Send Messages in Threads for writes; Add Reactions for new reactions; Manage Channels for channel creation/deletion; Manage Webhooks for webhook management; Manage Messages to delete other users' messages.
+4. To read ordinary message content, configure the Message Content privileged intent where required; larger/verified applications may require approval. It affects REST message fields too. Presence and Server Members intents are not needed for this REST-only server. See [Discord message content restrictions](https://docs.discord.com/developers/resources/message#message-object).
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
-    context = browser.new_context(user_agent="Mozilla/5.0 ...")
-    page = context.new_page()
+### MCP configuration
 
-    page.goto("https://discord.com/login")
-    page.locator('input[name="email"]').fill("your@email.com")
-    page.locator('input[name="password"]').fill("your_password")
-    page.locator('button[type="submit"]').click()
-
-    user_token = [None]
-    def on_response(response):
-        auth = response.request.headers.get('authorization', '')
-        if auth and not auth.startswith('Bot') and len(auth) > 50:
-            user_token[0] = auth
-    context.on("response", on_response)
-
-    page.goto("https://discord.com/channels/@me")
-    # Wait for token capture...
-```
-
-#### Option B: Bot Token (requires server admin)
-
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create New Application → Bot → Copy Token
-3. Enable Privileged Gateway Intents: Presence, Server Members, Message Content
-4. Invite bot with `bot` scope and appropriate permissions
-
-### 3. Configure
-
-Add to your `opencode.json` (or equivalent MCP config):
+For clients using `mcpServers` configuration:
 
 ```json
 {
-  "mcp": {
+  "mcpServers": {
     "discord": {
-      "type": "local",
-      "command": ["node", "/path/to/discord-mcp/index.mjs"],
-      "environment": {
-        "DISCORD_USER_TOKEN": "your_token_here"
+      "command": "node",
+      "args": ["/absolute/path/to/discord-mcp/assets/index.mjs"],
+      "env": {
+        "DISCORD_BOT_TOKEN": "REPLACE_WITH_BOT_TOKEN"
       }
     }
   }
 }
 ```
 
-For bot mode, use `DISCORD_BOT_TOKEN` instead of `DISCORD_USER_TOKEN`.
+For OpenCode:
 
-### 4. Restart
-
-The MCP server starts automatically on next launch. All 22 tools are available to your AI agent.
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DISCORD_USER_TOKEN` | Yes* | Discord user token (use with user auth mode) |
-| `DISCORD_BOT_TOKEN` | Yes* | Discord bot token (use with bot auth mode) |
-| `DISCORD_BANNED_GUILDS` | No | Comma-separated guild IDs to block all operations |
-| `DISCORD_BANNED_USERS` | No | Comma-separated user IDs to filter from reads |
-
-*\*Provide one of `DISCORD_USER_TOKEN` or `DISCORD_BOT_TOKEN`.*
-
-## Channel Name Resolution
-
-Instead of passing numeric channel IDs, you can use channel names:
-
-```
-# These are equivalent:
-channelId: "1234567890"
-channelId: "general"
+```json
+{
+  "mcp": {
+    "discord": {
+      "type": "local",
+      "command": ["node", "/absolute/path/to/discord-mcp/assets/index.mjs"],
+      "environment": {
+        "DISCORD_BOT_TOKEN": "REPLACE_WITH_BOT_TOKEN"
+      }
+    }
+  }
+}
 ```
 
-When a non-numeric value is passed as `channelId`, the server resolves it by listing channels in the guild and matching by name. This requires `guildId` to be provided in the same call for name lookups to work.
+Replace the path and placeholder locally, preferably using your client's secret handling. For user mode, replace the **environment key** with `DISCORD_USER_TOKEN`; do not configure both. If a desktop client cannot find Node, use the absolute path to its executable. Restart the MCP client after changes. The server writes protocol data to stdout and diagnostics to stderr.
 
-## Auth Modes
+## Environment variables
 
-| | User Token | Bot Token |
-|---|---|---|
-| **Setup** | Playwright capture from browser | Discord Developer Portal |
-| **Admin required** | No | Yes |
-| **Access scope** | Servers your account is in | Servers bot is invited to |
-| **Env variable** | `DISCORD_USER_TOKEN` | `DISCORD_BOT_TOKEN` |
+| Variable | Purpose |
+| --- | --- |
+| `DISCORD_BOT_TOKEN` | Supported bot credential; mutually exclusive with user token |
+| `DISCORD_USER_TOKEN` | Best-effort user-account credential; violates Discord terms |
+| `DISCORD_DEFAULT_GUILD_ID` | Numeric default guild for tools whose `guildId` is optional |
+| `DISCORD_BANNED_GUILD_IDS` | Comma-separated guild IDs; block reads **and** writes |
+| `DISCORD_BANNED_USER_IDS` | Comma-separated author IDs to omit from message results |
+| `DISCORD_BANNED_GUILDS` | Backward-compatible alias; merged with `DISCORD_BANNED_GUILD_IDS` |
+| `DISCORD_BANNED_USERS` | Backward-compatible alias; merged with `DISCORD_BANNED_USER_IDS` |
 
-User tokens are recommended for personal use. Bot tokens are recommended for shared/team setups.
+Whitespace and empty entries in ID lists are ignored. Guild blocking covers direct IDs, threads, reactions, channel management, and token-authenticated webhook operations. Guild listing hides blocked guilds. With blocking enabled, the server performs a metadata lookup to verify a channel/webhook's guild and fails closed if it cannot verify it; DM/group-DM channels remain available. These settings are local filters, not a substitute for Discord permissions. Metadata needed to check the restriction is still fetched, but blocked content is not returned or modified.
 
-## Rate Limits & Error Handling
+Author filtering applies to channel history, local search, pins, individual messages, and forum reads. An individual filtered message returns JSON `null`; counts describe the visible results. This does not remove mentions of those users from other people's messages.
 
-**Rate limits** are handled automatically. When Discord returns a 429, the server reads the `Retry-After` header and retries up to 3 times before failing.
+## Tools
 
-**Error codes** are mapped to human-readable solutions. For example:
+| Category | Tools |
+| --- | --- |
+| Guilds (2) | `discord_list_guilds`, `discord_get_server_info` |
+| Channels (4) | `discord_list_channels`, `discord_get_channel_info`, `discord_create_channel`, `discord_delete_channel` |
+| Messages (6) | `discord_read_channel`, `discord_send_message`, `discord_delete_message`, `discord_search_messages`, `discord_get_pinned`, `discord_get_message` |
+| Forums (4) | `discord_list_forums`, `discord_get_forum_post`, `discord_create_forum_post`, `discord_reply_to_forum` |
+| Reactions (3) | `discord_add_reaction`, `discord_remove_reaction`, `discord_add_multiple_reactions` |
+| Webhooks (4) | `discord_create_webhook`, `discord_list_webhooks`, `discord_send_webhook_message`, `discord_delete_webhook` |
 
-| Code | Meaning | Solution |
-|------|---------|----------|
-| 10003 | Unknown Channel | Verify channel ID or provide `guildId` for name resolution |
-| 50001 | Missing Access | Bot needs additional permissions or user lacks access |
-| 50013 | Missing Permissions | Grant the required permission in server settings |
+The earlier README listed names that never existed in the implementation (`discord_modify_channel`, `discord_get_guild`, `discord_list_forum_posts`, `discord_reply_to_thread`, `discord_batch_add_reactions`). Use the names above; this update does not add unrelated tools or aliases.
 
-## Prompt Template
+- **IDs and names:** Pass Discord IDs as strings. Guild names are matched case-insensitively using paginated guild listings. Channel names such as `general` or `#general` need `guildId` or a configured default. Duplicate names are rejected: use numeric IDs. Lookups are refreshed rather than cached indefinitely. Thread tools require numeric IDs.
+- **History:** `discord_read_channel` accepts `limit` from 1–100 (default 50) and either `before` or `after`, a message ID. Results are chronological. `discord_get_forum_post` returns up to 100 recent messages; use `discord_read_channel` with the thread ID to paginate.
+- **Search:** `discord_search_messages` searches up to 500 recent messages locally, newest first, with a case-insensitive substring. It is not Discord's full-history search endpoint.
+- **Pins:** `discord_get_pinned` uses `/channels/{id}/messages/pins`, with `limit` 1–50. When `hasMore` is true, pass the returned `nextBefore` timestamp as `before`. `pinnedCount` is the visible count in this page; cursors are based on unfiltered pins so filtering cannot stall pagination.
+- **Messages:** Send/reply bodies must contain 1–2000 characters. Discord's normal mention behavior is preserved. No file-upload or rich-message authoring tools are provided.
+- **Forums:** Titles are 1–100 characters; at most five tag names/IDs can be supplied. Unknown tags fail instead of being silently dropped. Discord still enforces required tags and permissions.
+- **Reactions:** Unicode emoji, `name:id`, `<:name:id>`, and `<a:name:id>` work. Batches accept 1–20 entries and report each outcome; partial failure sets MCP `isError`.
+- **Webhooks:** Execution uses webhook-token authentication without sending the account token, and `wait=true` to await Discord's response. Create/list results can contain webhook secrets; treat them as credentials. Forum/media webhook execution needs thread fields this tool does not expose; use forum tools for those channels.
+- **Audit reasons:** Channel/message deletion forwards the optional `reason` to Discord's audit-log header.
 
-Use this prompt to add Discord capabilities to any MCP-compatible AI agent:
+## Rate limits and failures
 
-```markdown
-You have access to Discord via MCP tools. All tool names start with `discord_`.
+Requests are serialized within one server process. The client learns route buckets scoped to major resources, observes reset headers, and shares global cooldowns across tools. A 429 uses the longest valid delay reported by `Retry-After`, JSON `retry_after`, or the bucket reset header, including fractional seconds. Missing/malformed delays fall back to one second. There are **three total attempts**, not three additional retries. See [Discord rate-limit documentation](https://docs.discord.com/developers/topics/rate-limits).
 
-Key behaviors:
-- Pass channel names (e.g. "general") instead of IDs. Include guildId for name resolution.
-- guildId is required for any operation that might need to resolve channel names.
-- Use pagination (before/after cursors) for reading large channel histories.
-- For forum channels, use the forum-specific tools (discord_list_forum_posts, etc.).
-- Webhooks allow sending messages with a custom username and avatar URL.
+An individual HTTP request, including its body, has a 15-second timeout. A required rate-limit wait over 30 seconds returns an error promptly and preserves the cooldown for subsequent calls. Separate server processes do not share rate-limit state; avoid running several against the same account. A queued tool call can take longer than one request timeout.
+
+Network failures, HTTP 5xx, 401/403, and malformed responses are not automatically replayed. A failed/timed-out write can have an unknown delivery outcome; check the channel before resending. Errors omit remote response bodies, request URLs, and credentials. Known Discord errors suggest checking IDs, membership, credentials, or permissions. No attempt is made to bypass Discord challenges or access restrictions.
+
+## Development and compatibility
+
+```sh
+npm ci
+npm run build
+npm run lint
+npm test
+# or all three:
+npm run check
+npm audit
 ```
+
+The source is native JavaScript ESM: `build` validates syntax; it does not transpile or generate a bundle. Tests use Node's built-in test runner, mocked Discord responses, and real MCP stdio child processes. They require no Discord token or network access. CI covers Node 22, 24, and 26.
+
+Runtime dependencies are `@modelcontextprotocol/server` 2.1.x and explicit `zod` 4.6.x. The MCP client SDK is a test dependency. `serveStdio` supports both legacy MCP initialization and the 2026-07-28 protocol negotiation. The [official SDK](https://github.com/modelcontextprotocol/typescript-sdk) documents v2 as the stable line; this update preserves the REST handlers while adapting registration and transport. The lockfile records the tested versions.
+
+See [CHANGELOG.md](CHANGELOG.md) for the September 2026 maintenance changes and compatibility differences. Automated tests do **not** prove live Discord user-token acceptance. No real Discord account was used for this maintenance pass.
 
 ## License
 
-[Apache-2.0](https://github.com/FmBlueSystem/discord-mcp/blob/main/LICENSE) © FmBlueSystem
+Apache-2.0, as declared by the upstream project. © FmBlueSystem.

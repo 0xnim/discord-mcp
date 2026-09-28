@@ -1,17 +1,35 @@
 {
   "name": "discord-mcp",
-  "version": "3.0.0",
-  "description": "Discord MCP Server for opencode — 22 tools, REST API mode, channel name resolution, forums, webhooks, reactions",
-  "main": "index.mjs",
+  "version": "3.1.0",
+  "description": "Discord MCP server \u2014 REST API tools for messages, forums, webhooks and reactions",
+  "main": "assets/index.mjs",
   "type": "module",
   "scripts": {
-    "start": "node index.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node assets/index.mjs",
+    "build": "node --check assets/index.mjs && node --check assets/discord-client.mjs",
+    "lint": "eslint .",
+    "test": "node --test",
+    "check": "npm run build && npm run lint && npm test"
   },
-  "keywords": ["discord", "mcp", "opencode", "ai", "model-context-protocol"],
+  "keywords": [
+    "discord",
+    "mcp",
+    "opencode",
+    "ai",
+    "model-context-protocol"
+  ],
   "author": "FmBlueSystem",
   "license": "Apache-2.0",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/server": "^2.1.0",
+    "zod": "^4.6.5"
+  },
+  "engines": {
+    "node": "^22.13.0 || >=24.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.1.0",
+    "eslint": "^10.11.0",
+    "@eslint/js": "^10.0.0"
   }
 }
